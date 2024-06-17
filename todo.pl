@@ -42,6 +42,32 @@ dodawanie :- write("tytul (enter zatwierda):"),read_line_to_string(user_input, T
 
 usun(Id) :- load(T), delete(T,[Id,_,_],W),save(W).
 
+levenshtein_distance(S1, S2, Distance) :-
+    string_chars(S1, L1),
+    string_chars(S2, L2),
+    levenshtein_distance_list(L1, L2, Distance).
+
+levenshtein_distance_list([], L, Distance) :- length(L, Distance).
+levenshtein_distance_list(L, [], Distance) :- length(L, Distance).
+levenshtein_distance_list([H1|T1], [H2|T2], Distance) :-
+    ( H1 = H2 ->
+        levenshtein_distance_list(T1, T2, Distance)
+    ;
+        levenshtein_distance_list([H1|T1], T2, D1),
+        levenshtein_distance_list(T1, [H2|T2], D2),
+        levenshtein_distance_list(T1, T2, D3),
+        min_list([D1, D2, D3], D),
+        Distance is D + 1, !
+    ).
+check_most_similar(_,[],'none').
+check_most_similar(_, [[_,Title,_]|[]], Title).
+check_most_similar(Text, [[_,Title,_]|Rest], S) :- check_most_similar(Text, Rest, S2), 
+                                                levenshtein_distance(Text, Title, D1),
+                                                levenshtein_distance(Text, S2, D2),
+                                                (D1 < D2 ->
+                                                    S is Title;
+                                                    S is S2
+                                                ).
 
 dialogBox(Header, Text, Input) :-
         new(D, dialog(Header)),
@@ -61,7 +87,7 @@ create_window(Window) :-
     send(Window, clear),
 
     % create button
-    new(Button, button('Add task', message(@prolog, button_click, Window))),
+    new(Button, button('Add task', message(@prolog, add_button_click, Window))),
     % add button to the window
     send(Window, display, Button, point(0, 15)),
 
@@ -80,9 +106,12 @@ create_window(Window) :-
     send(Window, open).
 
 
-button_click(Window) :-
+add_button_click(Window) :-
     dialogBox('Add task', 'Tytul',Title),
     dialogBox('Add task', 'Zawartosc',Content),
+    load(Data),
+    check_most_similar(Title, Data, Similar),
+    send(@display, inform, Similar),
     ostatnieid(Id), I is Id + 1,
     dodaj([I,Title,Content]),
     create_window(Window).
