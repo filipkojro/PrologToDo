@@ -2,7 +2,7 @@
 
 ### to run u need to
 
-on linux
+on linux somehow install prolog and run
 
 ```bash
 git clone https://github.com/filipkojro/PrologToDo.git
