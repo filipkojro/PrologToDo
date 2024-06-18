@@ -20,11 +20,15 @@ load(Term) :-
 
 dodaj(X) :- load(A), save([X|A]).
 
+usun(Id) :- load(T), delete(T,[Id,_,_],W),save(W).
+
 maxi([],0).
 maxi([[Id,_,_]|B],Id) :- maxi(B,L), Id > L.
 maxi([[Id,_,_]|B],L) :- maxi(B,L), Id =< L.
 
 ostatnieid(X) :- load(T), maxi(T,X).
+
+
 
 wypiszzadanie([]).
 wypiszzadanie([A|B]) :- write(" - "), write(A), wypiszzadanie(B).
@@ -38,8 +42,6 @@ dodawanie :- write("tytul (enter zatwierda):"),read_line_to_string(user_input, T
             ostatnieid(Id), I is Id + 1,
             dodaj([I,Title,Content]).
 
-
-usun(Id) :- load(T), delete(T,[Id,_,_],W),save(W).
 
 
 %levenshtein distance returns number of chars to change to have exact strings 
@@ -61,49 +63,29 @@ levenshtein_distance_list([H1|T1], [H2|T2], Distance) :-
         Distance is D + 1
     ), !.
 
-%checking most similar string in database to given
-check_most_similar(_,[],'none').
-check_most_similar(_, [[_,Title,_]|[]], Title).
-check_most_similar(Text, [[_,Title,_]|Rest], S) :- 
-    check_most_similar(Text, Rest, S2), 
-    levenshtein_distance(Text, Title, D1),
-    levenshtein_distance(Text, S2, D2),
-    (D1 < D2 ->
-        S = Title;
-        S = S2
-    ).
 
-%checking most similar string in database to given and returning similarity
-check_most_similar_with_number(_,[],'none', 666).
-check_most_similar_with_number(_, [[_,Title,_]|[]], Title, Len) :- string_length(Title, Len).
-check_most_similar_with_number(Text, [[_,Title,_]|Rest], S, Similarity) :- 
-    check_most_similar_with_number(Text, Rest, S2, Similarity2), 
-    levenshtein_distance(Text, Title, D1),
-    (D1 < Similarity2 ->
-        S = Title, Similarity = D1
-    ;
-        S = S2, Similarity = Similarity2
-    ).
+create_distance_list(_, [], []).
+create_distance_list(Text, [[Id,Title,_]|Rest], [[ListH, Id]|ListR]) :-
+    create_distance_list(Text, Rest, ListR),
+    levenshtein_distance(Text, Title, ListH).
 
 
-contains_substring(String, SubString) :-
-    sub_string(String, _, _, _, SubString).
+sort_by(Text, SortedList) :- 
+    load(Data),
+    create_distance_list(Text, Data, List),
+    sort(1, @=<, List, SortedList).
 
-% checking most similar string that is substring and seturning similarity
-check_most_similar_substring(Text, [], Result, 666) :- string_concat('none contains ', Text, Result).
-check_most_similar_substring(Text, [[_, Title, _] | Rest], S, Similarity) :- 
-    contains_substring(Title, Text), % Check if Title contains Text
-    levenshtein_distance(Text, Title, D1), % Calculate Levenshtein distance
-    check_most_similar_substring(Text, Rest, S2, Similarity2),
-    (D1 < Similarity2 -> 
-        S = Title, Similarity = D1
-    ; 
-        S = S2, Similarity = Similarity2
-    ), !.
 
-check_most_similar_substring(Text, [[_, Title, _] | Rest], S, Similarity) :- 
-    \+ contains_substring(Title, Text), % Negate the substring check
-    check_most_similar_substring(Text, Rest, S, Similarity), !.
+
+
+find_content_by_title(_, [], "unknown").
+find_content_by_title(Title, [[_,Title,Content]|_], Content).
+find_content_by_title(Title, [_|Rest], Content) :- find_content_by_title(Title, Rest, Content).
+
+find_element_by_id(_, [], "unknown", "unknown").
+find_element_by_id(Id, [[Id,Title,Content]|_],Title,  Content).
+find_element_by_id(Id, [_|Rest],Title, Content) :- find_element_by_id(Id, Rest, Title, Content), !.
+
 
 
 dialogBox(Header, Text, Input) :-
@@ -156,16 +138,6 @@ add_button_click(Window) :-
 
     create_window(Window).
 
-create_distance_list(_, [], []).
-create_distance_list(Text, [[Id,Title,_]|Rest], [[ListH, Id]|ListR]) :-
-    create_distance_list(Text, Rest, ListR),
-    levenshtein_distance(Text, Title, ListH).
-
-
-sort_by(Text, SortedList) :- 
-    load(Data),
-    create_distance_list(Text, Data, List),
-    sort(1, @=<, List, SortedList).
 
 search_button_click(Window) :-
 
@@ -177,14 +149,39 @@ search_button_click(Window) :-
     dialogBox('Search', 'By title', Title),
     sort_by(Title, SortedList),
 
-    search_list(Window, SortedList, 100,50),
+    display_search_list(Window, SortedList, 100,50),
     
     send(Window, open).
 
 
+% task removing button
+remove_button_click(Window, Id) :-
+    usun(Id),
+    create_window(Window).
 
-search_list(_, [], _, _).
-search_list(Window, [[_,Id]|Rest], X, Y) :-
+% display list on to window
+display_list(_, [], _, _).
+display_list(Window, [[Id,Title,Content]|Rest], X, Y) :-
+
+    new(Button, button('remove task', message(@prolog, remove_button_click, Window, Id))),
+    send(Window, display, Button, point(X-100, Y)),
+
+    new(Text, text(Title)),
+    send(Text, font, font(times, normal, 14)),
+    TitlePos is Y,
+    send(Window, display, Text, point(X, TitlePos)),
+
+    new(ContentText, text(Content)),
+    send(ContentText, font, font(times, normal, 14)),
+    ContentPos is Y + 14,
+    send(Window, display, ContentText, point(X, ContentPos)),
+
+    NextY is Y + 40,
+    display_list(Window, Rest, X, NextY).
+
+
+display_search_list(_, [], _, _).
+display_search_list(Window, [[_,Id]|Rest], X, Y) :-
 
     new(Button, button('remove task', message(@prolog, remove_button_click, Window, Id))),
     send(Window, display, Button, point(X-100, Y)),
@@ -204,41 +201,9 @@ search_list(Window, [[_,Id]|Rest], X, Y) :-
     send(Window, display, ContentText, point(X, ContentPos)),
 
     NextY is Y + 40,
-    search_list(Window, Rest, X, NextY).
+    display_search_list(Window, Rest, X, NextY).
 
 
-find_content_by_title(_, [], "unknown").
-find_content_by_title(Title, [[_,Title,Content]|_], Content).
-find_content_by_title(Title, [_|Rest], Content) :- find_content_by_title(Title, Rest, Content).
-
-find_element_by_id(_, [], "unknown", "unknown").
-find_element_by_id(Id, [[Id,Title,Content]|_],Title,  Content).
-find_element_by_id(Id, [_|Rest],Title, Content) :- find_element_by_id(Id, Rest, Title, Content), !.
-
-%task removing button
-remove_button_click(Window, Id) :-
-    usun(Id),
-    create_window(Window).
-
-%display list on to window
-display_list(_, [], _, _).
-display_list(Window, [[Id,Title,Content]|Rest], X, Y) :-
-
-    new(Button, button('remove task', message(@prolog, remove_button_click, Window, Id))),
-    send(Window, display, Button, point(X-100, Y)),
-
-    new(Text, text(Title)),
-    send(Text, font, font(times, normal, 14)),
-    TitlePos is Y,
-    send(Window, display, Text, point(X, TitlePos)),
-
-    new(ContentText, text(Content)),
-    send(ContentText, font, font(times, normal, 14)),
-    ContentPos is Y + 14,
-    send(Window, display, ContentText, point(X, ContentPos)),
-
-    NextY is Y + 40,
-    display_list(Window, Rest, X, NextY).
 
 %start program
 start :- 
