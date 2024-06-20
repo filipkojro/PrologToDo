@@ -132,26 +132,42 @@ add_button_click(Window) :-
     dialogBox('Add task', 'Tytul',Title),
     dialogBox('Add task', 'Zawartosc',Content),
 
-    %adding new task
-    ostatnieid(Id), I is Id + 1,
-    dodaj([I,Title,Content]),
+    string_length(Title, Length),
 
-    create_window(Window).
+    ( Length = 0 ->
+        send(@display, inform, 'nie mozna dodawac zadania z pustym tytulem'),
+        create_window(Window)
+    ;
+        %adding new task
+        ostatnieid(Id), I is Id + 1,
+        dodaj([I,Title,Content]),
+
+        create_window(Window)
+    ).
 
 
 search_button_click(Window) :-
 
-    send(Window, clear),
-
-    new(Button, button('Return', message(@prolog, create_window, Window))),
-    send(Window, display, Button, point(0, 15)),
-
     dialogBox('Search', 'By title', Title),
-    sort_by(Title, SortedList),
 
-    display_search_list(Window, SortedList, 100,50),
+    load(Data),
+    length(Data, Length),
+
+    (   Length = 0 ->
+
+        send(@display, inform, 'nie mozna szukac w pustej tabeli')
+    ;
+        send(Window, clear),
+
+        new(Button, button('Return', message(@prolog, create_window, Window))),
+        send(Window, display, Button, point(0, 15)),
+
+        sort_by(Title, SortedList),
+
+        display_search_list(Window, SortedList, 100,50),
     
-    send(Window, open).
+        send(Window, open)
+    ).
 
 
 % task removing button
